@@ -6,6 +6,7 @@ const {
   banUser,
   getAllEventsAdmin,
   deleteEventAdmin,
+  toggleFeatureEvent,
 } = require("../controllers/user.controller");
 const { protect, authorize } = require("../middleware/auth");
 
@@ -19,5 +20,6 @@ router.delete("/:id", protect, authorize("ADMIN"), deleteUser);
 router.patch("/:id/ban", protect, authorize("ADMIN"), banUser);
 router.get("/admin/events", protect, authorize("ADMIN"), getAllEventsAdmin);
 router.delete("/admin/events/:id", protect, authorize("ADMIN"), deleteEventAdmin);
+router.patch("/admin/events/:id/feature", protect, authorize("ADMIN"), toggleFeatureEvent);
 
 module.exports = router;

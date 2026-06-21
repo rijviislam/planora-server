@@ -65,6 +65,23 @@ const deleteEventAdmin = asyncHandler(async (req, res) => {
   res.status(200).json({ success: true, message: "Event removed by admin" });
 });
 
+// PATCH /api/users/admin/events/:id/feature  (admin: toggle an event as featured on the homepage)
+const toggleFeatureEvent = asyncHandler(async (req, res) => {
+  const event = await prisma.event.findUnique({ where: { id: req.params.id } });
+  if (!event) throw new ApiError(404, "Event not found");
+
+  const updated = await prisma.event.update({
+    where: { id: req.params.id },
+    data: { isFeatured: !event.isFeatured },
+  });
+
+  res.status(200).json({
+    success: true,
+    message: updated.isFeatured ? "Event marked as featured" : "Event removed from featured",
+    data: { id: updated.id, isFeatured: updated.isFeatured },
+  });
+});
+
 module.exports = {
   updateProfile,
   getAllUsers,
@@ -72,4 +89,5 @@ module.exports = {
   banUser,
   getAllEventsAdmin,
   deleteEventAdmin,
+  toggleFeatureEvent,
 };

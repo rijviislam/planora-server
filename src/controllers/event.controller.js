@@ -41,14 +41,16 @@ const getEvents = asyncHandler(async (req, res) => {
 });
 
 // GET /api/events/featured
-const getFeaturedEvent = asyncHandler(async (req, res) => {
-  const event = await prisma.event.findFirst({
+// GET /api/events/featured  (returns up to 6 featured public events for the hero slider)
+const getFeaturedEvents = asyncHandler(async (req, res) => {
+  const events = await prisma.event.findMany({
     where: { isFeatured: true, visibility: "PUBLIC" },
     include: { owner: { select: { id: true, name: true } } },
     orderBy: { date: "asc" },
+    take: 6,
   });
 
-  res.status(200).json({ success: true, data: event });
+  res.status(200).json({ success: true, data: events });
 });
 
 // GET /api/events/:id
@@ -141,7 +143,7 @@ const getMyEvents = asyncHandler(async (req, res) => {
 
 module.exports = {
   getEvents,
-  getFeaturedEvent,
+  getFeaturedEvents,
   getEventById,
   createEvent,
   updateEvent,
