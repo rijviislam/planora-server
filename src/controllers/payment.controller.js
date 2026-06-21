@@ -15,7 +15,8 @@ const initPayment = asyncHandler(async (req, res) => {
 
   const event = await prisma.event.findUnique({ where: { id: eventId } });
   if (!event) throw new ApiError(404, "Event not found");
-  if (Number(event.fee) <= 0) throw new ApiError(400, "This event does not require payment");
+  if (Number(event.fee) <= 0)
+    throw new ApiError(400, "This event does not require payment");
 
   const transactionId = uuidv4();
 
@@ -55,7 +56,14 @@ const initPayment = asyncHandler(async (req, res) => {
   const apiResponse = await sslcz.init(data);
 
   if (!apiResponse?.GatewayPageURL) {
-    throw new ApiError(502, "Failed to initiate payment gateway session");
+    console.error("SSLCommerz init failed:", JSON.stringify(apiResponse));
+    throw new ApiError(
+      502,
+      "Failed to initiate payment gateway session",
+      process.env.NODE_ENV !== "production"
+        ? { sslcommerzResponse: apiResponse }
+        : null,
+    );
   }
 
   res.status(200).json({
@@ -69,21 +77,35 @@ const paymentSuccess = asyncHandler(async (req, res) => {
   const { tranId } = req.params;
   const invitationId = req.body?.value_a || null;
 
-  const payment = await prisma.payment.findUnique({ where: { transactionId: tranId } });
+  const payment = await prisma.payment.findUnique({
+    where: { transactionId: tranId },
+  });
   if (!payment) throw new ApiError(404, "Payment record not found");
 
   const operations = [
-    prisma.payment.update({ where: { transactionId: tranId }, data: { status: "SUCCESS" } }),
+    prisma.payment.update({
+      where: { transactionId: tranId },
+      data: { status: "SUCCESS" },
+    }),
     prisma.participation.upsert({
-      where: { userId_eventId: { userId: payment.userId, eventId: payment.eventId } },
+      where: {
+        userId_eventId: { userId: payment.userId, eventId: payment.eventId },
+      },
       update: { status: "PENDING" },
-      create: { userId: payment.userId, eventId: payment.eventId, status: "PENDING" },
+      create: {
+        userId: payment.userId,
+        eventId: payment.eventId,
+        status: "PENDING",
+      },
     }),
   ];
 
   if (invitationId) {
     operations.push(
-      prisma.invitation.update({ where: { id: invitationId }, data: { status: "ACCEPTED" } })
+      prisma.invitation.update({
+        where: { id: invitationId },
+        data: { status: "ACCEPTED" },
+      }),
     );
   }
 
@@ -98,7 +120,9 @@ const paymentFail = asyncHandler(async (req, res) => {
     where: { transactionId: req.params.tranId },
     data: { status: "FAILED" },
   });
-  res.redirect(`${process.env.CLIENT_URL}/payment/fail?tranId=${req.params.tranId}`);
+  res.redirect(
+    `${process.env.CLIENT_URL}/payment/fail?tranId=${req.params.tranId}`,
+  );
 });
 
 // POST /api/payments/cancel/:tranId
@@ -107,7 +131,9 @@ const paymentCancel = asyncHandler(async (req, res) => {
     where: { transactionId: req.params.tranId },
     data: { status: "FAILED" },
   });
-  res.redirect(`${process.env.CLIENT_URL}/payment/cancel?tranId=${req.params.tranId}`);
+  res.redirect(
+    `${process.env.CLIENT_URL}/payment/cancel?tranId=${req.params.tranId}`,
+  );
 });
 
 // GET /api/payments/mine
