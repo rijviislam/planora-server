@@ -2,7 +2,7 @@ const express = require("express");
 const { body } = require("express-validator");
 const {
   getEvents,
-  getFeaturedEvent,
+  getFeaturedEvents,
   getEventById,
   createEvent,
   updateEvent,
@@ -31,7 +31,7 @@ const eventValidation = [
 ];
 
 router.get("/", getEvents);
-router.get("/featured", getFeaturedEvent);
+router.get("/featured", getFeaturedEvents);
 router.get("/mine", protect, getMyEvents);
 router.get("/:id", getEventById);
 
