@@ -26,6 +26,12 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
 app.use(morgan("dev"));
+app.get("/", (req, res) => {
+  res.status(200).json({
+    success: true,
+    message: "Planora server is running",
+  });
+});
 
 app.get("/api/health", (req, res) => {
   res.json({ status: "ok", service: "planora-server" });
