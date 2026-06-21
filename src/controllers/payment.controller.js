@@ -67,18 +67,27 @@ const initPayment = asyncHandler(async (req, res) => {
 // POST /api/payments/success/:tranId  (SSLCommerz redirects here)
 const paymentSuccess = asyncHandler(async (req, res) => {
   const { tranId } = req.params;
+  const invitationId = req.body?.value_a || null;
 
   const payment = await prisma.payment.findUnique({ where: { transactionId: tranId } });
   if (!payment) throw new ApiError(404, "Payment record not found");
 
-  await prisma.$transaction([
+  const operations = [
     prisma.payment.update({ where: { transactionId: tranId }, data: { status: "SUCCESS" } }),
     prisma.participation.upsert({
       where: { userId_eventId: { userId: payment.userId, eventId: payment.eventId } },
       update: { status: "PENDING" },
       create: { userId: payment.userId, eventId: payment.eventId, status: "PENDING" },
     }),
-  ]);
+  ];
+
+  if (invitationId) {
+    operations.push(
+      prisma.invitation.update({ where: { id: invitationId }, data: { status: "ACCEPTED" } })
+    );
+  }
+
+  await prisma.$transaction(operations);
 
   res.redirect(`${process.env.CLIENT_URL}/payment/success?tranId=${tranId}`);
 });
