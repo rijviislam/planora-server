@@ -36,6 +36,8 @@ app.get("/", (req, res) => {
 const allowedOrigins = [
   process.env.CLIENT_URL,
   "http://localhost:3000",
+  "https://sandbox.sslcommerz.com",
+  "https://securepay.sslcommerz.com",
 ].filter(Boolean);
 
 app.use(
