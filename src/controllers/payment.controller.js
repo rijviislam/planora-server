@@ -30,27 +30,33 @@ const initPayment = asyncHandler(async (req, res) => {
     },
   });
 
-  const data = {
-    total_amount: Number(event.fee),
-    currency: "BDT",
-    tran_id: transactionId,
-    success_url: `${process.env.SERVER_URL}/api/payments/success/${transactionId}`,
-    fail_url: `${process.env.SERVER_URL}/api/payments/fail/${transactionId}`,
-    cancel_url: `${process.env.SERVER_URL}/api/payments/cancel/${transactionId}`,
-    ipn_url: `${process.env.SERVER_URL}/api/payments/ipn`,
-    shipping_method: "NA",
-    product_name: event.title,
-    product_category: "Event Registration",
-    product_profile: "general",
-    cus_name: req.user.name,
-    cus_email: req.user.email,
-    cus_add1: "N/A",
-    cus_city: "N/A",
-    cus_postcode: "N/A",
-    cus_country: "Bangladesh",
-    cus_phone: "N/A",
-    value_a: invitationId || "",
-  };
+const data = {
+  total_amount: Number(event.fee),
+  currency: "BDT",
+  tran_id: transactionId,
+  success_url: `${process.env.SERVER_URL}/api/payments/success/${transactionId}`,
+  fail_url: `${process.env.SERVER_URL}/api/payments/fail/${transactionId}`,
+  cancel_url: `${process.env.SERVER_URL}/api/payments/cancel/${transactionId}`,
+  ipn_url: `${process.env.SERVER_URL}/api/payments/ipn`,
+  shipping_method: "NO",           // change "NA" → "NO"
+  product_name: event.title,
+  product_category: "Event Registration",
+  product_profile: "non-physical-goods",
+  cus_name: req.user.name,
+  cus_email: req.user.email,
+  cus_add1: "Dhaka",
+  cus_city: "Dhaka",
+  cus_postcode: "1212",
+  cus_country: "Bangladesh",
+  cus_phone: req.user.phone || "01711111111",
+  // ✅ Add these shipping fields:
+  ship_name: req.user.name,
+  ship_add1: "Dhaka",
+  ship_city: "Dhaka",
+  ship_postcode: "1212",
+  ship_country: "Bangladesh",
+  value_a: invitationId || "",
+};
 
   const sslcz = new SSLCommerzPayment(store_id, store_passwd, is_live);
   const apiResponse = await sslcz.init(data);
