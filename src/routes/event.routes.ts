@@ -1,18 +1,18 @@
-const express = require("express");
-const { body } = require("express-validator");
-const {
+import { Router } from "express";
+import { body } from "express-validator";
+import {
+  createEvent,
+  deleteEvent,
+  getEventById,
   getEvents,
   getFeaturedEvents,
-  getEventById,
-  createEvent,
-  updateEvent,
-  deleteEvent,
   getMyEvents,
-} = require("../controllers/event.controller");
-const { protect } = require("../middleware/auth");
-const validate = require("../middleware/validate");
+  updateEvent,
+} from "../controllers/event.controller";
+import { protect } from "../middleware/auth";
+import validate from "../middleware/validate";
 
-const router = express.Router();
+const router = Router();
 
 const eventValidation = [
   body("title").trim().notEmpty().withMessage("Title is required"),
@@ -34,9 +34,8 @@ router.get("/", getEvents);
 router.get("/featured", getFeaturedEvents);
 router.get("/mine", protect, getMyEvents);
 router.get("/:id", getEventById);
-
 router.post("/", protect, eventValidation, validate, createEvent);
 router.patch("/:id", protect, updateEvent);
 router.delete("/:id", protect, deleteEvent);
 
-module.exports = router;
+export default router;

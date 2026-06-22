@@ -1,16 +1,15 @@
+import { Request, Response } from "express";
+import { v4 as uuidv4 } from "uuid";
+import { prisma } from "../config/db";
+import ApiError from "../utils/ApiError";
+import asyncHandler from "../utils/asyncHandler";
 const SSLCommerzPayment = require("sslcommerz-lts");
-const { v4: uuidv4 } = require("uuid");
-const { prisma } = require("../config/db");
-const ApiError = require("../utils/ApiError");
-const asyncHandler = require("../utils/asyncHandler");
 
 const store_id = process.env.SSLCOMMERZ_STORE_ID;
 const store_passwd = process.env.SSLCOMMERZ_STORE_PASSWORD;
 const is_live = process.env.SSLCOMMERZ_IS_LIVE === "true";
 
-// POST /api/payments/init  { eventId, invitationId? }
-// Kicks off SSLCommerz checkout for a paid event (direct join or invitation accept).
-const initPayment = asyncHandler(async (req, res) => {
+const initPayment = asyncHandler(async (req: Request, res: Response) => {
   const { eventId, invitationId } = req.body;
 
   const event = await prisma.event.findUnique({ where: { id: eventId } });
@@ -22,7 +21,7 @@ const initPayment = asyncHandler(async (req, res) => {
 
   const payment = await prisma.payment.create({
     data: {
-      userId: req.user.id,
+      userId: req.user!.id,
       eventId: event.id,
       amount: event.fee,
       status: "PENDING",
@@ -30,39 +29,38 @@ const initPayment = asyncHandler(async (req, res) => {
     },
   });
 
-const data = {
-  total_amount: Number(event.fee),
-  currency: "BDT",
-  tran_id: transactionId,
-  success_url: `${process.env.SERVER_URL}/api/payments/success/${transactionId}`,
-  fail_url: `${process.env.SERVER_URL}/api/payments/fail/${transactionId}`,
-  cancel_url: `${process.env.SERVER_URL}/api/payments/cancel/${transactionId}`,
-  ipn_url: `${process.env.SERVER_URL}/api/payments/ipn`,
-  shipping_method: "NO",           // change "NA" → "NO"
-  product_name: event.title,
-  product_category: "Event Registration",
-  product_profile: "non-physical-goods",
-  cus_name: req.user.name,
-  cus_email: req.user.email,
-  cus_add1: "Dhaka",
-  cus_city: "Dhaka",
-  cus_postcode: "1212",
-  cus_country: "Bangladesh",
-  cus_phone: req.user.phone || "01711111111",
-  // ✅ Add these shipping fields:
-  ship_name: req.user.name,
-  ship_add1: "Dhaka",
-  ship_city: "Dhaka",
-  ship_postcode: "1212",
-  ship_country: "Bangladesh",
-  value_a: invitationId || "",
-};
+  const user = req.user!;
+  const data = {
+    total_amount: Number(event.fee),
+    currency: "BDT",
+    tran_id: transactionId,
+    success_url: `${process.env.SERVER_URL}/api/payments/success/${transactionId}`,
+    fail_url: `${process.env.SERVER_URL}/api/payments/fail/${transactionId}`,
+    cancel_url: `${process.env.SERVER_URL}/api/payments/cancel/${transactionId}`,
+    ipn_url: `${process.env.SERVER_URL}/api/payments/ipn`,
+    shipping_method: "NO",
+    product_name: event.title,
+    product_category: "Event Registration",
+    product_profile: "non-physical-goods",
+    cus_name: user.name,
+    cus_email: user.email,
+    cus_add1: "Dhaka",
+    cus_city: "Dhaka",
+    cus_postcode: "1212",
+    cus_country: "Bangladesh",
+    cus_phone: (user as any).phone || "01711111111",
+    ship_name: user.name,
+    ship_add1: "Dhaka",
+    ship_city: "Dhaka",
+    ship_postcode: "1212",
+    ship_country: "Bangladesh",
+    value_a: invitationId || "",
+  };
 
   const sslcz = new SSLCommerzPayment(store_id, store_passwd, is_live);
   const apiResponse = await sslcz.init(data);
 
   if (!apiResponse?.GatewayPageURL) {
-    console.error("SSLCommerz init failed:", JSON.stringify(apiResponse));
     throw new ApiError(
       502,
       "Failed to initiate payment gateway session",
@@ -78,9 +76,8 @@ const data = {
   });
 });
 
-// POST /api/payments/success/:tranId  (SSLCommerz redirects here)
-const paymentSuccess = asyncHandler(async (req, res) => {
-  const { tranId } = req.params;
+const paymentSuccess = asyncHandler(async (req: Request, res: Response) => {
+  const tranId = req.params.tranId as string;
   const invitationId = req.body?.value_a || null;
 
   const payment = await prisma.payment.findUnique({
@@ -88,7 +85,7 @@ const paymentSuccess = asyncHandler(async (req, res) => {
   });
   if (!payment) throw new ApiError(404, "Payment record not found");
 
-  const operations = [
+  const operations: any[] = [
     prisma.payment.update({
       where: { transactionId: tranId },
       data: { status: "SUCCESS" },
@@ -116,36 +113,30 @@ const paymentSuccess = asyncHandler(async (req, res) => {
   }
 
   await prisma.$transaction(operations);
-
   res.redirect(`${process.env.CLIENT_URL}/payment/success?tranId=${tranId}`);
 });
 
-// POST /api/payments/fail/:tranId
-const paymentFail = asyncHandler(async (req, res) => {
+const paymentFail = asyncHandler(async (req: Request, res: Response) => {
+  const tranId = req.params.tranId as string;
   await prisma.payment.update({
-    where: { transactionId: req.params.tranId },
+    where: { transactionId: tranId },
     data: { status: "FAILED" },
   });
-  res.redirect(
-    `${process.env.CLIENT_URL}/payment/fail?tranId=${req.params.tranId}`,
-  );
+  res.redirect(`${process.env.CLIENT_URL}/payment/fail?tranId=${tranId}`);
 });
 
-// POST /api/payments/cancel/:tranId
-const paymentCancel = asyncHandler(async (req, res) => {
+const paymentCancel = asyncHandler(async (req: Request, res: Response) => {
+  const tranId = req.params.tranId as string;
   await prisma.payment.update({
-    where: { transactionId: req.params.tranId },
+    where: { transactionId: tranId },
     data: { status: "FAILED" },
   });
-  res.redirect(
-    `${process.env.CLIENT_URL}/payment/cancel?tranId=${req.params.tranId}`,
-  );
+  res.redirect(`${process.env.CLIENT_URL}/payment/cancel?tranId=${tranId}`);
 });
 
-// GET /api/payments/mine
-const getMyPayments = asyncHandler(async (req, res) => {
+const getMyPayments = asyncHandler(async (req: Request, res: Response) => {
   const payments = await prisma.payment.findMany({
-    where: { userId: req.user.id },
+    where: { userId: req.user!.id },
     include: { event: { select: { id: true, title: true } } },
     orderBy: { createdAt: "desc" },
   });
@@ -153,10 +144,10 @@ const getMyPayments = asyncHandler(async (req, res) => {
   res.status(200).json({ success: true, data: payments });
 });
 
-module.exports = {
-  initPayment,
-  paymentSuccess,
-  paymentFail,
-  paymentCancel,
+export {
   getMyPayments,
+  initPayment,
+  paymentCancel,
+  paymentFail,
+  paymentSuccess,
 };

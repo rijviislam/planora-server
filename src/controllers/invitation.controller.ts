@@ -1,0 +1,101 @@
+import { Request, Response } from "express";
+import { prisma } from "../config/db";
+import ApiError from "../utils/ApiError";
+import asyncHandler from "../utils/asyncHandler";
+
+const createInvitation = asyncHandler(async (req: Request, res: Response) => {
+  const { eventId, invitedEmail } = req.body;
+
+  const event = await prisma.event.findUnique({ where: { id: eventId } });
+  if (!event) throw new ApiError(404, "Event not found");
+
+  if (event.ownerId !== req.user!.id && req.user!.role !== "ADMIN")
+    throw new ApiError(403, "Only the event owner can send invitations");
+
+  const invitedUser = await prisma.user.findUnique({
+    where: { email: invitedEmail },
+  });
+  if (!invitedUser) throw new ApiError(404, "No user found with that email");
+
+  const invitation = await prisma.invitation.create({
+    data: { eventId, invitedById: req.user!.id, invitedId: invitedUser.id },
+  });
+
+  res
+    .status(201)
+    .json({ success: true, message: "Invitation sent", data: invitation });
+});
+
+const getMyInvitations = asyncHandler(async (req: Request, res: Response) => {
+  const invitations = await prisma.invitation.findMany({
+    where: { invitedId: req.user!.id },
+    include: {
+      event: true,
+      invitedBy: { select: { id: true, name: true } },
+    },
+    orderBy: { createdAt: "desc" },
+  });
+
+  res.status(200).json({ success: true, data: invitations });
+});
+
+const declineInvitation = asyncHandler(async (req: Request, res: Response) => {
+  const id = req.params.id as string;
+  const invitation = await prisma.invitation.findUnique({ where: { id } });
+  if (!invitation) throw new ApiError(404, "Invitation not found");
+  if (invitation.invitedId !== req.user!.id)
+    throw new ApiError(403, "This invitation does not belong to you");
+
+  const updated = await prisma.invitation.update({
+    where: { id },
+    data: { status: "DECLINED" },
+  });
+  res
+    .status(200)
+    .json({ success: true, message: "Invitation declined", data: updated });
+});
+
+const acceptInvitation = asyncHandler(async (req: Request, res: Response) => {
+  const id = req.params.id as string;
+  const invitation = await prisma.invitation.findUnique({
+    where: { id },
+    include: { event: true },
+  });
+  if (!invitation) throw new ApiError(404, "Invitation not found");
+  if (invitation.invitedId !== req.user!.id)
+    throw new ApiError(403, "This invitation does not belong to you");
+
+  if (Number(invitation.event.fee) > 0)
+    throw new ApiError(
+      400,
+      "This event requires payment. Use the pay & accept endpoint",
+    );
+
+  const [updatedInvitation, participation] = await prisma.$transaction([
+    prisma.invitation.update({ where: { id }, data: { status: "ACCEPTED" } }),
+    prisma.participation.upsert({
+      where: {
+        userId_eventId: { userId: req.user!.id, eventId: invitation.eventId },
+      },
+      update: { status: "APPROVED" },
+      create: {
+        userId: req.user!.id,
+        eventId: invitation.eventId,
+        status: "APPROVED",
+      },
+    }),
+  ]);
+
+  res.status(200).json({
+    success: true,
+    message: "Invitation accepted",
+    data: { invitation: updatedInvitation, participation },
+  });
+});
+
+export {
+  acceptInvitation,
+  createInvitation,
+  declineInvitation,
+  getMyInvitations,
+};

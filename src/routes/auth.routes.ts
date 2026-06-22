@@ -1,10 +1,10 @@
-const express = require("express");
-const { body } = require("express-validator");
-const { register, login, logout, getMe } = require("../controllers/auth.controller");
-const validate = require("../middleware/validate");
-const { protect } = require("../middleware/auth");
+import { Router } from "express";
+import { body } from "express-validator";
+import { getMe, login, logout, register } from "../controllers/auth.controller";
+import { protect } from "../middleware/auth";
+import validate from "../middleware/validate";
 
-const router = express.Router();
+const router = Router();
 
 router.post(
   "/register",
@@ -16,7 +16,7 @@ router.post(
       .withMessage("Password must be at least 6 characters"),
   ],
   validate,
-  register
+  register,
 );
 
 router.post(
@@ -26,10 +26,10 @@ router.post(
     body("password").notEmpty().withMessage("Password is required"),
   ],
   validate,
-  login
+  login,
 );
 
 router.post("/logout", logout);
 router.get("/me", protect, getMe);
 
-module.exports = router;
+export default router;
